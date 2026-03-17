@@ -60,6 +60,10 @@ jobs:
           rm -rf build-app
           mkdir -p build-app/src
 
+      - name: Copy init sources
+        run: |
+          cp -R db/* build-app/db/
+
       - name: Copy all COBOL OOP sources
         run: |
           cp -R src/* build-app/src/
