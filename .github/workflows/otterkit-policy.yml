@@ -125,7 +125,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
-          PGPASSWORD=postgres psql -h localhost -U postgres -d insurance -f db/init.
+          PGPASSWORD=postgres psql -h localhost -U postgres -d insurance -f build-app/db/init.sql
+
       - name: Add PostgreSQL driver (Npgsql)
         run: |
           cd build-app/.otterkit/OtterkitExport
