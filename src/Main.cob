@@ -1,14 +1,23 @@
-       class-id. Program.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. Main.
 
-       method-id. Main static.
-           invoke type Policy "InsertPolicy" using 
-               800016251, "2014-10-28", 1000027885, "Nguyen T Thien", "1992-09-07",
-               1000027885, "Nguyen T Thien", "1992-09-07",
-               "PREMIUM PAYING", "PVI Sun Life Foresight", "Direct Bill",
-               "2014-08-13", "2014-11-13", null,
-               2500000, 2, "QUARTERLY", 0, 2500000, 2500000,
-               "VND", 0, 0
-           goback.
-       end method Main.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS Policy AS "Policy".
 
-       end class Program.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 PolObj OBJECT REFERENCE Policy.
+
+       PROCEDURE DIVISION.
+           DISPLAY "=== MAIN PROGRAM START ==="
+
+           INVOKE Policy "NEW" RETURNING PolObj
+           INVOKE PolObj "Show"
+
+           *> Demo InsertPolicy
+           INVOKE Policy "InsertPolicy" USING 800016251, "Nguyen T Thien", "Nguyen T Thien", "PREMIUM PAYING", 2500000
+
+           DISPLAY "=== MAIN PROGRAM END ==="
+           STOP RUN.
