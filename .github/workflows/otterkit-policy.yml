@@ -394,11 +394,18 @@ jobs:
       # BƯỚC 5: Cấu hình .NET và Driver (Chạy sau khi đã có thư mục Export)
       - name: Add PostgreSQL driver (Npgsql)
         run: |
-          if [ -d "build-app/.otterkit/OtterkitExport" ]; then
-            cd build-app/.otterkit/OtterkitExport
-            dotnet add package Npgsql --version 7.0.0
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          # Tìm file .csproj bên trong thư mục OtterkitExport
+          PROJECT_FILE=$(find build-app/.otterkit/OtterkitExport -name "*.csproj" | head -n 1)
+          
+          if [ -f "$PROJECT_FILE" ]; then
+            echo "Found project file: $PROJECT_FILE"
+            dotnet add "$PROJECT_FILE" package Npgsql --version 7.0.0
           else
-            echo "Warning: OtterkitExport folder not found, skipping Npgsql install."
+            echo "Error: No .csproj file found in OtterkitExport."
+            echo "Current files in Export folder:"
+            ls -R build-app/.otterkit/OtterkitExport
+            exit 1
           fi
 
       # BƯỚC 6: Kiểm tra và đóng gói kết quả
