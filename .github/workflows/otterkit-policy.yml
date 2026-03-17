@@ -1,4 +1,4 @@
-name: Build COBOL Policy CRUD with Otterkit
+name: Build Multi-File COBOL OOP with Otterkit
 
 on:
   push:
@@ -9,77 +9,117 @@ on:
 
 jobs:
   build-otterkit:
-    runs-on: ubuntu-22.04
-
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: insurance
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup .NET 7 SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '7.0.x'
 
       - name: Setup .NET 8 SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
+      - name: Show .NET info
+        run: |
+          dotnet --info
+          dotnet --list-sdks
+          dotnet --list-runtimes
+
       - name: Install Otterkit templates
-        run: dotnet new install Otterkit.Templates::1.0.45-alpha
+        run: |
+          dotnet new install Otterkit.Templates::1.0.45-alpha
 
       - name: Install Otterkit tool
         run: |
           dotnet tool install --global Otterkit --version 1.0.80 || \
           dotnet tool update --global Otterkit --version 1.0.80
+
           echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Verify Otterkit
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          otterkit --help || true
 
       - name: Prepare build workspace
         run: |
           rm -rf build-app
           mkdir -p build-app/src
+
+      - name: Copy all COBOL OOP sources
+        run: |
           cp -R src/* build-app/src/
+
           echo "ENTRY_FILE=src/Main.cob" >> $GITHUB_ENV
 
-      - name: Init PostgreSQL schema from file
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-          PGPASSWORD=postgres psql -h localhost -U postgres -d insurance -f db/init.sql
+          echo "===== build-app/src tree ====="
+          find build-app/src -type f -print
 
-      - name: Transpile COBOL with Otterkit
+          echo "===== ENTRY FILE ====="
+          echo "src/Main.cob"
+
+          echo "===== Main.cob content ====="
+          cat build-app/src/Main.cob
+
+      - name: Transpile multi-file OOP COBOL with Otterkit
         run: |
           export PATH="$PATH:$HOME/.dotnet/tools"
+
           cd build-app
-          otterkit build -e "$ENTRY_FILE" --free
 
-      - name: Add PostgreSQL driver (Npgsql)
-        run: |
-          cd build-app/.otterkit/OtterkitExport
-          dotnet add package Npgsql --version 7.0.0
+          echo "Using entry file: $ENTRY_FILE"
+          echo "===== build-app tree before transpile ====="
+          find . -type f -print
 
-      - name: Build transpiled C# project
-        run: |
-          cd build-app/.otterkit/OtterkitExport
-          dotnet restore
-          dotnet build
+          otterkit build -e "$ENTRY_FILE" --free || true
 
-      - name: Run Policy demo
+          echo "===== build-app tree after transpile ====="
+          find . -type f -print
+
+      - name: Inspect generated files
         run: |
-          cd build-app/.otterkit/OtterkitExport
-          dotnet run
+          echo "===== GENERATED FILES ====="
+          find build-app -type f -print || true
+
+          echo "===== .otterkit folder ====="
+          find build-app/.otterkit -type f -print 2>/dev/null || true
+
+          echo "===== Search for generated C# ====="
+          find build-app -type f -name "*.cs" -print 2>/dev/null || true
+
+      - name: Show generated C# files
+        run: |
+          CSFILES=$(find build-app -type f -name "*.cs" 2>/dev/null || true)
+
+          if [ -n "$CSFILES" ]; then
+            for f in $CSFILES; do
+              echo "===== FILE: $f ====="
+              sed -n '1,220p' "$f"
+              echo
+            done
+          else
+            echo "No generated .cs files found."
+          fi
+
+      - name: Check generated project files
+        run: |
+          echo "===== Search for .csproj ====="
+          find build-app -type f -name "*.csproj" -print 2>/dev/null || true
+
+          echo "===== Search for OtterkitLibrary refs ====="
+          grep -R "OtterkitLibrary" build-app/.otterkit 2>/dev/null || true
+
+      - name: Package build output
+        run: |
+          cd build-app
+          zip -r ../otterkit-build-output.zip . || true
+          cd ..
+
+          ls -lah otterkit-build-output.zip || true
+
+      - name: Upload transpiled output artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: otterkit-build-output
+          path: otterkit-build-output.zip
