@@ -392,10 +392,13 @@ jobs:
           mkdir -p build-app/src
           mkdir -p build-app/db
 
+      - name: Copy init sources
+        run: |
+          cp -R db/* build-app/db/
+
       - name: Copy all COBOL OOP sources
         run: |
           cp -R src/* build-app/src/
-          cp -R db/* build-app/db/
 
           echo "ENTRY_FILE=src/Main.cob" >> $GITHUB_ENV
 
