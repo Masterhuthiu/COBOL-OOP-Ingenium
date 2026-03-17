@@ -4,10 +4,10 @@
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
        REPOSITORY.
-           CLASS Customer AS "Customer"
-           CLASS Order AS "Order"
-           CLASS Product AS "Product"
-           CLASS Policy AS "Policy".
+           CLASS Customer 
+           CLASS Order 
+           CLASS Product 
+           CLASS Policy .
 
        DATA DIVISION.
        WORKING-STORAGE SECTION.
