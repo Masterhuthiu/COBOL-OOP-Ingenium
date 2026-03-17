@@ -90,7 +90,8 @@ jobs:
           echo "===== build-app tree before transpile ====="
           find . -type f -print
 
-          otterkit build -e "$ENTRY_FILE" --free || true
+          otterkit build -e "$ENTRY_FILE" --free
+
 
           echo "===== build-app tree after transpile ====="
           find . -type f -print
