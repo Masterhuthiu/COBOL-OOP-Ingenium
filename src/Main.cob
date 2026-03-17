@@ -1,10 +1,3 @@
-      ******************************************************************
-      * Author:
-      * Date:
-      * Purpose:
-      * Tectonics: cobc
-      * Copyright (c) 2024 by Your Company. All rights reserved.
-      ******************************************************************
        IDENTIFICATION DIVISION.
        PROGRAM-ID. YOUR-PROGRAM-NAME.
        DATA DIVISION.
