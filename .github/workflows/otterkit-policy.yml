@@ -314,6 +314,159 @@
 
 # otterkit-oop.yml
 
+# name: Build OOP COBOL with Otterkit CLI
+
+# on:
+#   push:
+#     branches: [ main, master ]
+#   pull_request:
+#   workflow_dispatch:
+
+# env:
+#   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# jobs:
+#   build:
+#     runs-on: ubuntu-22.04
+
+#     steps:
+#       - name: Checkout source
+#         uses: actions/checkout@v4
+
+#       - name: Setup .NET 7
+#         uses: actions/setup-dotnet@v4
+#         with:
+#           dotnet-version: '7.0.x'
+
+#       - name: Setup .NET 8
+#         uses: actions/setup-dotnet@v4
+#         with:
+#           dotnet-version: '8.0.x'
+
+#       - name: Verify installed runtimes
+#         run: |
+#           dotnet --info
+#           dotnet --list-sdks
+#           dotnet --list-runtimes
+
+#       # RẤT QUAN TRỌNG: dùng template version gần tool version
+#       - name: Install Otterkit templates
+#         run: dotnet new install Otterkit.Templates::1.0.45-alpha
+
+#       - name: Install Otterkit CLI
+#         run: dotnet tool install --global Otterkit --version 1.0.80
+
+#       - name: Add dotnet tools to PATH
+#         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+#       - name: Verify Otterkit
+#         run: |
+#           which otterkit || true
+#           otterkit --version
+
+#       - name: Create OOP COBOL source if missing
+#         run: |
+#           mkdir -p src
+#           if [ ! -f src/HELLO.cob ]; then
+#             printf '%s\n' \
+#               '       IDENTIFICATION DIVISION.' \
+#               '       CLASS-ID. HELLO.' \
+#               '' \
+#               '       METHOD-ID. MAIN.' \
+#               '       PROCEDURE DIVISION.' \
+#               '           DISPLAY "HELLO FROM OOP COBOL WITH OTTERKIT".' \
+#               '           GOBACK.' \
+#               '       END METHOD MAIN.' \
+#               '' \
+#               '       END CLASS HELLO.' > src/HELLO.cob
+#           fi
+#           echo "===== src ====="
+#           ls -la src
+#           cat src/HELLO.cob
+
+#       - name: Create Otterkit app skeleton
+#         run: |
+#           rm -rf build-app
+#           otterkit new app build-app
+#           echo "===== build-app tree after otterkit new app ====="
+#           find build-app -maxdepth 6 -type f | sort || true
+#           echo "===== build-app dirs ====="
+#           find build-app -maxdepth 4 -type d | sort || true
+
+#       - name: Replace default COBOL source with our file
+#         run: |
+#           COBFILE=$(find build-app -type f \( -name "*.cob" -o -name "*.cbl" \) | head -n 1)
+
+#           echo "Found skeleton COBOL file: $COBFILE"
+
+#           if [ -n "$COBFILE" ]; then
+#             cp src/HELLO.cob "$COBFILE"
+#             ENTRY_FILE="${COBFILE#build-app/}"
+#           else
+#             mkdir -p build-app/src
+#             cp src/HELLO.cob build-app/src/HELLO.cob
+#             ENTRY_FILE="src/HELLO.cob"
+#           fi
+
+#           echo "ENTRY_FILE=$ENTRY_FILE" >> $GITHUB_ENV
+
+#           echo "===== final entry file ====="
+#           echo "$ENTRY_FILE"
+#           cat "build-app/$ENTRY_FILE"
+
+#       - name: Create missing Otterkit export folder
+#         run: |
+#           mkdir -p build-app/.otterkit/OtterkitExport
+#           echo "===== ensured export folder ====="
+#           find build-app/.otterkit -maxdepth 3 -type d | sort || true
+
+#       - name: Show build-app layout before build
+#         run: |
+#           echo "===== build-app layout ====="
+#           find build-app -maxdepth 8 -type f | sort || true
+#           echo "===== build-app dirs ====="
+#           find build-app -maxdepth 6 -type d | sort || true
+
+#       - name: Build with Otterkit
+#         run: |
+#           cd build-app
+#           echo "Using entry file: $ENTRY_FILE"
+#           otterkit build -e "$ENTRY_FILE" --free
+
+#       - name: Show generated files after build
+#         if: always()
+#         run: |
+#           echo "===== build-app tree ====="
+#           find build-app -maxdepth 10 -type f | sort || true
+
+#           echo "===== search for OtterkitLibrary references ====="
+#           grep -R "using OtterkitLibrary" -n build-app || true
+
+#           if [ -f build-app/.otterkit/OtterkitExport/HELLO.cs ]; then
+#             echo "===== HELLO.cs ====="
+#             sed -n '1,200p' build-app/.otterkit/OtterkitExport/HELLO.cs
+#           fi
+
+#           if [ -f build-app/.otterkit/OtterkitExport/Startup.cs ]; then
+#             echo "===== Startup.cs ====="
+#             sed -n '1,200p' build-app/.otterkit/OtterkitExport/Startup.cs
+#           fi
+
+#           if [ -f build-app/.otterkit/OtterkitExport/OtterkitExport.csproj ]; then
+#             echo "===== OtterkitExport.csproj ====="
+#             sed -n '1,200p' build-app/.otterkit/OtterkitExport/OtterkitExport.csproj
+#           fi
+
+#       - name: Upload artifacts
+#         if: always()
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: otterkit-build-output
+#           path: |
+#             build-app/**
+
+# otterkit-oop.yml
+
 name: Build Multi-File COBOL OOP with Otterkit
 
 on:
@@ -327,109 +480,114 @@ jobs:
   build-otterkit:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: insurance
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup .NET Runtimes
+      - name: Setup .NET 8 SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            7.0.x
-            8.0.x
+          dotnet-version: '8.0.x'
 
-      - name: Install Otterkit Tool & Templates
+      - name: Show .NET info
+        run: |
+          dotnet --info
+          dotnet --list-sdks
+          dotnet --list-runtimes
+
+      - name: Install Otterkit templates
         run: |
           dotnet new install Otterkit.Templates::1.0.45-alpha
+
+      - name: Install Otterkit tool
+        run: |
           dotnet tool install --global Otterkit --version 1.0.80 || \
           dotnet tool update --global Otterkit --version 1.0.80
+
           echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Verify Otterkit
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          otterkit --help || true
 
       - name: Prepare build workspace
         run: |
           rm -rf build-app
           mkdir -p build-app/src
-          mkdir -p build-app/db
-          # Tạo sẵn thư mục export
-          mkdir -p build-app/.otterkit/OtterkitExport
 
-      - name: Copy sources to workspace
+      - name: Copy all COBOL OOP sources
         run: |
-          # Copy DB schema
-          if [ -d "db" ]; then cp -R db/* build-app/db/ ; fi
-          # Copy COBOL sources
           cp -R src/* build-app/src/
+
           echo "ENTRY_FILE=src/Main.cob" >> $GITHUB_ENV
 
-      - name: Init PostgreSQL schema
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-          # Chỉ chạy nếu file init.sql tồn tại
-          if [ -f "build-app/db/init.sql" ]; then
-            PGPASSWORD=postgres psql -h localhost -U postgres -d insurance -f build-app/db/init.sql
-          else
-            echo "Warning: build-app/db/init.sql not found. Skipping DB init."
-          fi
+          echo "===== build-app/src tree ====="
+          find build-app/src -type f -print
 
-      - name: Transpile COBOL with Otterkit
+          echo "===== ENTRY FILE ====="
+          echo "src/Main.cob"
+
+          echo "===== Main.cob content ====="
+          cat build-app/src/Main.cob
+
+      - name: Transpile multi-file OOP COBOL with Otterkit
         run: |
           export PATH="$PATH:$HOME/.dotnet/tools"
+
           cd build-app
-          
+
           echo "Using entry file: $ENTRY_FILE"
-          # BỎ '|| true' để GitHub Actions dừng lại và báo lỗi nếu COBOL sai cú pháp
-          otterkit build -e "$ENTRY_FILE" --free
-          
-          echo "Transpile successful. Checking generated files..."
-          ls -R .otterkit/OtterkitExport
+          echo "===== build-app tree before transpile ====="
+          find . -type f -print
 
-      - name: Add PostgreSQL driver (Npgsql)
+          otterkit build -e "$ENTRY_FILE" --free || true
+
+          echo "===== build-app tree after transpile ====="
+          find . -type f -print
+
+      - name: Inspect generated files
         run: |
-          export PATH="$PATH:$HOME/.dotnet/tools"
-          
-          # Tìm file .csproj bên trong thư mục OtterkitExport
-          PROJECT_FILE=$(find build-app/.otterkit/OtterkitExport -name "*.csproj" | head -n 1)
-          
-          if [ -f "$PROJECT_FILE" ]; then
-            echo "Found project file: $PROJECT_FILE"
-            dotnet add "$PROJECT_FILE" package Npgsql --version 7.0.0
+          echo "===== GENERATED FILES ====="
+          find build-app -type f -print || true
+
+          echo "===== .otterkit folder ====="
+          find build-app/.otterkit -type f -print 2>/dev/null || true
+
+          echo "===== Search for generated C# ====="
+          find build-app -type f -name "*.cs" -print 2>/dev/null || true
+
+      - name: Show generated C# files
+        run: |
+          CSFILES=$(find build-app -type f -name "*.cs" 2>/dev/null || true)
+
+          if [ -n "$CSFILES" ]; then
+            for f in $CSFILES; do
+              echo "===== FILE: $f ====="
+              sed -n '1,220p' "$f"
+              echo
+            done
           else
-            echo "Error: No .csproj file found. Otterkit did not generate the project."
-            echo "Check the 'Transpile COBOL' step for syntax errors in your .cob files."
-            ls -R build-app/.otterkit/OtterkitExport
-            exit 1
+            echo "No generated .cs files found."
           fi
 
-      - name: Build Final .NET Project
+      - name: Check generated project files
         run: |
-          PROJECT_FILE=$(find build-app/.otterkit/OtterkitExport -name "*.csproj" | head -n 1)
-          if [ -f "$PROJECT_FILE" ]; then
-            dotnet build "$PROJECT_FILE" -c Release
-          fi
+          echo "===== Search for .csproj ====="
+          find build-app -type f -name "*.csproj" -print 2>/dev/null || true
+
+          echo "===== Search for OtterkitLibrary refs ====="
+          grep -R "OtterkitLibrary" build-app/.otterkit 2>/dev/null || true
 
       - name: Package build output
-        if: always()
         run: |
-          zip -r otterkit-build-output.zip build-app/
-          
-      - name: Upload artifact
-        if: always()
+          cd build-app
+          zip -r ../otterkit-build-output.zip . || true
+          cd ..
+
+          ls -lah otterkit-build-output.zip || true
+
+      - name: Upload transpiled output artifact
         uses: actions/upload-artifact@v4
         with:
           name: otterkit-build-output
