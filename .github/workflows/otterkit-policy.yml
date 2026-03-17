@@ -102,6 +102,17 @@ jobs:
             echo "No generated .cs files found."
           fi
 
+# 
+      - name: Init PostgreSQL schema from file
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          PGPASSWORD=postgres psql -h localhost -U postgres -d insurance -f db/init.
+      - name: Add PostgreSQL driver (Npgsql)
+        run: |
+          cd build-app/.otterkit/OtterkitExport
+          dotnet add package Npgsql --version 7.0.0
+# 
       - name: Check generated project files
         run: |
           echo "===== Search for .csproj ====="

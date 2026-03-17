@@ -19,7 +19,7 @@
        PROCEDURE DIVISION.
            DISPLAY "=== MAIN PROGRAM START ==="
            INVOKE Policy "NEW" RETURNING PoObj
-           INVOKE PoObj "Display"
+           INVOKE PoObj "Show"
 
            INVOKE Customer "NEW" RETURNING CustObj
            INVOKE CustObj "Show"
