@@ -360,41 +360,49 @@ jobs:
           dotnet tool update --global Otterkit --version 1.0.80
           echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-      # BƯỚC 1: Chuẩn bị workspace (Phải chạy trước khi dùng file)
       - name: Prepare build workspace
         run: |
           rm -rf build-app
           mkdir -p build-app/src
           mkdir -p build-app/db
-          # Tạo sẵn thư mục export để tránh lỗi DirectoryNotFound của Otterkit
+          # Tạo sẵn thư mục export
           mkdir -p build-app/.otterkit/OtterkitExport
 
-      # BƯỚC 2: Copy nguồn vào workspace
       - name: Copy sources to workspace
         run: |
-          cp -R db/* build-app/db/ 2>/dev/null || echo "No db files"
+          # Copy DB schema
+          if [ -d "db" ]; then cp -R db/* build-app/db/ ; fi
+          # Copy COBOL sources
           cp -R src/* build-app/src/
           echo "ENTRY_FILE=src/Main.cob" >> $GITHUB_ENV
 
-      # BƯỚC 3: Khởi tạo Database (Lúc này build-app/db/init.sql đã tồn tại)
       - name: Init PostgreSQL schema
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
-          PGPASSWORD=postgres psql -h localhost -U postgres -d insurance -f build-app/db/init.sql
+          # Chỉ chạy nếu file init.sql tồn tại
+          if [ -f "build-app/db/init.sql" ]; then
+            PGPASSWORD=postgres psql -h localhost -U postgres -d insurance -f build-app/db/init.sql
+          else
+            echo "Warning: build-app/db/init.sql not found. Skipping DB init."
+          fi
 
-      # BƯỚC 4: Biên dịch COBOL sang C#
       - name: Transpile COBOL with Otterkit
         run: |
           export PATH="$PATH:$HOME/.dotnet/tools"
           cd build-app
-          # build-app/src/Main.cob là entry point
-          otterkit build -e "$ENTRY_FILE" --free || true
+          
+          echo "Using entry file: $ENTRY_FILE"
+          # BỎ '|| true' để GitHub Actions dừng lại và báo lỗi nếu COBOL sai cú pháp
+          otterkit build -e "$ENTRY_FILE" --free
+          
+          echo "Transpile successful. Checking generated files..."
+          ls -R .otterkit/OtterkitExport
 
-      # BƯỚC 5: Cấu hình .NET và Driver (Chạy sau khi đã có thư mục Export)
       - name: Add PostgreSQL driver (Npgsql)
         run: |
           export PATH="$PATH:$HOME/.dotnet/tools"
+          
           # Tìm file .csproj bên trong thư mục OtterkitExport
           PROJECT_FILE=$(find build-app/.otterkit/OtterkitExport -name "*.csproj" | head -n 1)
           
@@ -402,23 +410,26 @@ jobs:
             echo "Found project file: $PROJECT_FILE"
             dotnet add "$PROJECT_FILE" package Npgsql --version 7.0.0
           else
-            echo "Error: No .csproj file found in OtterkitExport."
-            echo "Current files in Export folder:"
+            echo "Error: No .csproj file found. Otterkit did not generate the project."
+            echo "Check the 'Transpile COBOL' step for syntax errors in your .cob files."
             ls -R build-app/.otterkit/OtterkitExport
             exit 1
           fi
 
-      # BƯỚC 6: Kiểm tra và đóng gói kết quả
-      - name: Inspect generated files
+      - name: Build Final .NET Project
         run: |
-          echo "===== GENERATED C# FILES ====="
-          find build-app/.otterkit/OtterkitExport -name "*.cs" || echo "No .cs files generated"
-          
+          PROJECT_FILE=$(find build-app/.otterkit/OtterkitExport -name "*.csproj" | head -n 1)
+          if [ -f "$PROJECT_FILE" ]; then
+            dotnet build "$PROJECT_FILE" -c Release
+          fi
+
       - name: Package build output
+        if: always()
         run: |
           zip -r otterkit-build-output.zip build-app/
           
       - name: Upload artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: otterkit-build-output
