@@ -7,15 +7,14 @@
            CLASS Customer
            CLASS Order
            CLASS Product.
-      * Dấu chấm kết thúc danh sách REPOSITORY.
+      
 
        DATA DIVISION.
        WORKING-STORAGE SECTION.
        01 CustObj  USAGE OBJECT REFERENCE Customer.
        01 OrderObj USAGE OBJECT REFERENCE Order.
        01 ProdObj  USAGE OBJECT REFERENCE Product.
-      * Bắt buộc có USAGE và dấu chấm kết thúc mỗi dòng.
-
+      
        PROCEDURE DIVISION.
            DISPLAY "=== MAIN PROGRAM START ==="
 
