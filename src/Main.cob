@@ -6,8 +6,8 @@
        REPOSITORY.
            CLASS Customer AS "Customer"
            CLASS Order AS "Order"
-           CLASS Product AS "Product".
-           CLASS Product AS "Policy".
+           CLASS Product AS "Product"
+           CLASS Policy AS "Policy".
 
        DATA DIVISION.
        WORKING-STORAGE SECTION.
