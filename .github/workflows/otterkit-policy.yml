@@ -326,6 +326,7 @@ on:
 jobs:
   build-otterkit:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:15
@@ -340,134 +341,77 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup .NET 7
+      - name: Setup .NET Runtimes
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '7.0.x'
+          dotnet-version: |
+            7.0.x
+            8.0.x
 
-      - name: Setup .NET 8 SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Show .NET info
-        run: |
-          dotnet --info
-          dotnet --list-sdks
-          dotnet --list-runtimes
-
-      - name: Install Otterkit templates
+      - name: Install Otterkit Tool & Templates
         run: |
           dotnet new install Otterkit.Templates::1.0.45-alpha
-
-      - name: Install Otterkit tool
-        run: |
           dotnet tool install --global Otterkit --version 1.0.80 || \
           dotnet tool update --global Otterkit --version 1.0.80
-
           echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
-#
-      - name: Init PostgreSQL schema from file
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-          PGPASSWORD=postgres psql -h localhost -U postgres -d insurance -f build-app/db/init.sql
-      - name: Add PostgreSQL driver (Npgsql)
-        run: |
-          cd build-app/.otterkit/OtterkitExport
-          dotnet add package Npgsql --version 7.0.0
-#
-      - name: Verify Otterkit
-        run: |
-          export PATH="$PATH:$HOME/.dotnet/tools"
-          otterkit --help || true
 
+      # BƯỚC 1: Chuẩn bị workspace (Phải chạy trước khi dùng file)
       - name: Prepare build workspace
         run: |
           rm -rf build-app
           mkdir -p build-app/src
           mkdir -p build-app/db
+          # Tạo sẵn thư mục export để tránh lỗi DirectoryNotFound của Otterkit
+          mkdir -p build-app/.otterkit/OtterkitExport
 
-      - name: Copy init sources
+      # BƯỚC 2: Copy nguồn vào workspace
+      - name: Copy sources to workspace
         run: |
-          cp -R db/* build-app/db/
-
-      - name: Copy all COBOL OOP sources
-        run: |
+          cp -R db/* build-app/db/ 2>/dev/null || echo "No db files"
           cp -R src/* build-app/src/
-
           echo "ENTRY_FILE=src/Main.cob" >> $GITHUB_ENV
 
-          echo "===== build-app/src tree ====="
-          find build-app/src -type f -print
+      # BƯỚC 3: Khởi tạo Database (Lúc này build-app/db/init.sql đã tồn tại)
+      - name: Init PostgreSQL schema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          PGPASSWORD=postgres psql -h localhost -U postgres -d insurance -f build-app/db/init.sql
 
-          echo "===== ENTRY FILE ====="
-          echo "src/Main.cob"
-
-          echo "===== Main.cob content ====="
-          cat build-app/src/Main.cob
-
-      - name: Transpile multi-file OOP COBOL with Otterkit
+      # BƯỚC 4: Biên dịch COBOL sang C#
+      - name: Transpile COBOL with Otterkit
         run: |
           export PATH="$PATH:$HOME/.dotnet/tools"
-
           cd build-app
-
-          echo "Using entry file: $ENTRY_FILE"
-          echo "===== build-app tree before transpile ====="
-          find . -type f -print
-
+          # build-app/src/Main.cob là entry point
           otterkit build -e "$ENTRY_FILE" --free || true
 
-          echo "===== build-app tree after transpile ====="
-          find . -type f -print
-
-      - name: Inspect generated files
+      # BƯỚC 5: Cấu hình .NET và Driver (Chạy sau khi đã có thư mục Export)
+      - name: Add PostgreSQL driver (Npgsql)
         run: |
-          echo "===== GENERATED FILES ====="
-          find build-app -type f -print || true
-
-          echo "===== .otterkit folder ====="
-          find build-app/.otterkit -type f -print 2>/dev/null || true
-
-          echo "===== Search for generated C# ====="
-          find build-app -type f -name "*.cs" -print 2>/dev/null || true
-
-      - name: Show generated C# files
-        run: |
-          CSFILES=$(find build-app -type f -name "*.cs" 2>/dev/null || true)
-
-          if [ -n "$CSFILES" ]; then
-            for f in $CSFILES; do
-              echo "===== FILE: $f ====="
-              sed -n '1,220p' "$f"
-              echo
-            done
+          if [ -d "build-app/.otterkit/OtterkitExport" ]; then
+            cd build-app/.otterkit/OtterkitExport
+            dotnet add package Npgsql --version 7.0.0
           else
-            echo "No generated .cs files found."
+            echo "Warning: OtterkitExport folder not found, skipping Npgsql install."
           fi
 
-      - name: Check generated project files
+      # BƯỚC 6: Kiểm tra và đóng gói kết quả
+      - name: Inspect generated files
         run: |
-          echo "===== Search for .csproj ====="
-          find build-app -type f -name "*.csproj" -print 2>/dev/null || true
-
-          echo "===== Search for OtterkitLibrary refs ====="
-          grep -R "OtterkitLibrary" build-app/.otterkit 2>/dev/null || true
-
+          echo "===== GENERATED C# FILES ====="
+          find build-app/.otterkit/OtterkitExport -name "*.cs" || echo "No .cs files generated"
+          
       - name: Package build output
         run: |
-          cd build-app
-          zip -r ../otterkit-build-output.zip . || true
-          cd ..
-
-          ls -lah otterkit-build-output.zip || true
-
-      - name: Upload transpiled output artifact
+          zip -r otterkit-build-output.zip build-app/
+          
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: otterkit-build-output
