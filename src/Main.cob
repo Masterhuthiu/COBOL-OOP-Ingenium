@@ -7,7 +7,7 @@
            CLASS Customer 
            CLASS Order 
            CLASS Product 
-           CLASS Policy .
+           CLASS Policy.
 
        DATA DIVISION.
        WORKING-STORAGE SECTION.
