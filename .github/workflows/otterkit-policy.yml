@@ -59,6 +59,7 @@ jobs:
         run: |
           rm -rf build-app
           mkdir -p build-app/src
+          mkdir -p build-app/db
 
       - name: Copy init sources
         run: |
