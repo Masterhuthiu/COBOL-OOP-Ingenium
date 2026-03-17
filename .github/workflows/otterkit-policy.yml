@@ -1,0 +1,85 @@
+name: Build COBOL Policy CRUD with Otterkit
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-otterkit:
+    runs-on: ubuntu-22.04
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: insurance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 7 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '7.0.x'
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Otterkit templates
+        run: dotnet new install Otterkit.Templates::1.0.45-alpha
+
+      - name: Install Otterkit tool
+        run: |
+          dotnet tool install --global Otterkit --version 1.0.80 || \
+          dotnet tool update --global Otterkit --version 1.0.80
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Prepare build workspace
+        run: |
+          rm -rf build-app
+          mkdir -p build-app/src
+          cp -R src/* build-app/src/
+          echo "ENTRY_FILE=src/Main.cob" >> $GITHUB_ENV
+
+      - name: Init PostgreSQL schema from file
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          PGPASSWORD=postgres psql -h localhost -U postgres -d insurance -f db/init.sql
+
+      - name: Transpile COBOL with Otterkit
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          cd build-app
+          otterkit build -e "$ENTRY_FILE" --free
+
+      - name: Add PostgreSQL driver (Npgsql)
+        run: |
+          cd build-app/.otterkit/OtterkitExport
+          dotnet add package Npgsql --version 7.0.0
+
+      - name: Build transpiled C# project
+        run: |
+          cd build-app/.otterkit/OtterkitExport
+          dotnet restore
+          dotnet build
+
+      - name: Run Policy demo
+        run: |
+          cd build-app/.otterkit/OtterkitExport
+          dotnet run
