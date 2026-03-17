@@ -326,10 +326,28 @@ on:
 jobs:
   build-otterkit:
     runs-on: ubuntu-latest
-
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: insurance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup .NET 7
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '7.0.x'
 
       - name: Setup .NET 8 SDK
         uses: actions/setup-dotnet@v4
@@ -352,7 +370,17 @@ jobs:
           dotnet tool update --global Otterkit --version 1.0.80
 
           echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
-
+#
+      - name: Init PostgreSQL schema from file
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          PGPASSWORD=postgres psql -h localhost -U postgres -d insurance -f build-app/db/init.sql
+      - name: Add PostgreSQL driver (Npgsql)
+        run: |
+          cd build-app/.otterkit/OtterkitExport
+          dotnet add package Npgsql --version 7.0.0
+#
       - name: Verify Otterkit
         run: |
           export PATH="$PATH:$HOME/.dotnet/tools"
@@ -362,10 +390,12 @@ jobs:
         run: |
           rm -rf build-app
           mkdir -p build-app/src
+          mkdir -p build-app/db
 
       - name: Copy all COBOL OOP sources
         run: |
           cp -R src/* build-app/src/
+          cp -R db/* build-app/db/
 
           echo "ENTRY_FILE=src/Main.cob" >> $GITHUB_ENV
 
